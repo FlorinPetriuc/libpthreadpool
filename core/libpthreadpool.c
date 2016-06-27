@@ -19,6 +19,8 @@
 #include "./heap/heap.h"
 #include "./misc/mem.h"
 
+const unsigned int libpthreadpool_version = 100;
+
 static void *pthread_pool_fct(void *arg)
 {
 	struct libpthreadpool_heap_t *queue;
@@ -34,8 +36,11 @@ static void *pthread_pool_fct(void *arg)
 		task = libpthreadpool_remove_from_heap(queue);
 				
 		ret = task->fct(task->fct_prm);
-				
-		task->cb(task->seq, ret);
+		
+		if(task->cb)
+		{
+			task->cb(task->seq, ret);
+		}
 		
 		free(task);
 	}
