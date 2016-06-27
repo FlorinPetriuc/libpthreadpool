@@ -18,13 +18,13 @@
 
 #include "heap.h"
 #include "../misc/mem.h"
-#include "../engine/engine.h"
+#include "../engine.h"
  
-struct heap_t *libpthreadpool_create_heap()
+struct libpthreadpool_heap_t *libpthreadpool_create_heap()
 {
-	struct heap_t *ret;
+	struct libpthreadpool_heap_t *ret;
 	
-	ret = xmalloc(sizeof(struct heap_t));
+	ret = xmalloc(sizeof(struct libpthreadpool_heap_t));
 		
 	ret->arr = xmalloc(8 * sizeof(struct libpthreadpool_task_t));
 	ret->len = 8;
@@ -37,10 +37,17 @@ struct heap_t *libpthreadpool_create_heap()
 		exit(EXIT_FAILURE);
 	}
 	
+	if(pthread_cond_init(&ret->cond, NULL))
+	{
+		perror("[FATAL] unable to initialize heap cond");
+		
+		exit(EXIT_FAILURE);
+	}
+	
 	return ret;
 }
 
-static void swim_up(struct heap_t *heap)
+static void swim_up(struct libpthreadpool_heap_t *heap)
 {
 	unsigned int i;
 	unsigned int parent;
@@ -73,7 +80,7 @@ static void swim_up(struct heap_t *heap)
 	}
 }
 
-static void sink_down(struct heap_t *heap)
+static void sink_down(struct libpthreadpool_heap_t *heap)
 {
 	unsigned int i;
 	unsigned int l_child;
@@ -126,7 +133,7 @@ static void sink_down(struct heap_t *heap)
 	}
 }
 
-void libpthreadpool_add_to_heap(struct heap_t *heap, struct libpthreadpool_task_t task)
+void libpthreadpool_add_to_heap(struct libpthreadpool_heap_t *heap, struct libpthreadpool_task_t task)
 {
 	pthread_mutex_lock(&heap->mtx);
 
@@ -143,19 +150,18 @@ void libpthreadpool_add_to_heap(struct heap_t *heap, struct libpthreadpool_task_
 	swim_up(heap);
 	
 	pthread_mutex_unlock(&heap->mtx);
+	pthread_cond_signal(&heap->cond);
 }
 
-struct libpthreadpool_task_t *libpthreadpool_remove_from_heap(struct heap_t *heap)
+struct libpthreadpool_task_t *libpthreadpool_remove_from_heap(struct libpthreadpool_heap_t *heap)
 {
 	struct libpthreadpool_task_t *ret;
 
 	pthread_mutex_lock(&heap->mtx);
 	
-	if(heap->occ == 0)
+	while(heap->occ == 0)
 	{
-		pthread_mutex_unlock(&heap->mtx);
-	
-		return NULL;
+		pthread_cond_wait(&heap->cond, &heap->mtx);
 	}
 	
 	ret = xmalloc(sizeof(struct libpthreadpool_task_t));
@@ -176,25 +182,4 @@ struct libpthreadpool_task_t *libpthreadpool_remove_from_heap(struct heap_t *hea
 	pthread_mutex_unlock(&heap->mtx);
 	
 	return ret;
-}
-
-void libpthreadpool_print_heap(struct heap_t *heap)
-{
-	unsigned int i;
-
-	pthread_mutex_lock(&heap->mtx);
-
-	printf("Heap %p\r\n", heap);
-	printf("Heap len: %u\r\n", heap->len);
-	printf("Heap occ: %u\r\n", heap->occ);
-	
-	for(i = 0; i < heap->occ; ++i)
-	{
-		printf("Element %u: %p %p %u %u\r\n", i, heap->arr[i].fct, heap->arr[i].fct_prm, heap->arr[i].seq, heap->arr[i].prio);
-	}
-
-	printf("\r\n");
-	fflush(stdout);
-
-	pthread_mutex_unlock(&heap->mtx);
 }

@@ -12,20 +12,25 @@
  * General Public License for more details.
  */
  
-#ifndef _ENGINE_H_
-#define _ENGINE_H_
+#ifndef _LIBPTHREAD_POOL_H_
+#define _LIBPTHREAD_POOL_H_
+
+#include <pthread.h>
+
+struct libpthreadpool_heap_t;
 
 typedef void* (*libpthreadpool_function_t)(void *arg);
+typedef void (*libpthreadpool_cb_function_t)(const unsigned int seq, void *fct_ret);
 
-struct libpthreadpool_task_t
+struct pthreadpool_t
 {
-	libpthreadpool_function_t fct;
+	struct libpthreadpool_heap_t *queue;
 	
-	void *fct_prm;
-	
-	unsigned int seq;
-	
-	unsigned int prio;
+	pthread_t *workers;
 };
+
+struct pthreadpool_t *create_pthreadpool(const unsigned int number_of_workers);
+void libpthreadpool_add_task(struct pthreadpool_t *pool, libpthreadpool_function_t fct, libpthreadpool_cb_function_t cb, 
+															void *fct_prm, const unsigned int seq, const unsigned int prio);
 
 #endif

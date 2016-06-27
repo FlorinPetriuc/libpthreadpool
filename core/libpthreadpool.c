@@ -11,74 +11,74 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
  */
- 
+
 #include <stdio.h>
- 
+#include <stdlib.h>
+
+#include "engine.h"
 #include "./heap/heap.h"
-#include "./engine/engine.h"
- 
-void *f_test(void *arg)
+#include "./misc/mem.h"
+
+static void *pthread_pool_fct(void *arg)
 {
+	struct libpthreadpool_heap_t *queue;
+	
+	struct libpthreadpool_task_t *task;
+	
+	void *ret;
+	
+	queue = arg;
+	
+	while(1)
+	{
+		task = libpthreadpool_remove_from_heap(queue);
+				
+		ret = task->fct(task->fct_prm);
+				
+		task->cb(task->seq, ret);
+		
+		free(task);
+	}
+	
 	return NULL;
 }
- 
-int main(void)
+
+struct pthreadpool_t *create_pthreadpool(const unsigned int number_of_workers)
 {
-	struct heap_t *heap;
-	
-	struct libpthreadpool_task_t task;
-	struct libpthreadpool_task_t *rem_task;
-	
 	unsigned int i;
 
-	heap = libpthreadpool_create_heap();
+	struct pthreadpool_t *ret;
 	
-	printf("[INFO] Created heap %p\r\n", heap);
-	fflush(stdout);
+	ret = xmalloc(sizeof(struct pthreadpool_t));
 	
-	libpthreadpool_print_heap(heap);
+	ret->queue = libpthreadpool_create_heap();
+	ret->workers = xmalloc(number_of_workers * sizeof(pthread_t));
 	
-	for(i = 0; i < 16; ++i)
+	for(i = 0; i < number_of_workers; ++i)
 	{
-		printf("[INFO] Iteration %u\r\n", i);
-		fflush(stdout);
-	
-		task.fct = f_test;
-		task.fct_prm = (void *)i;
-		task.seq = 16 - i;
-		task.prio = i;
-	
-		libpthreadpool_add_to_heap(heap, task);
-		
-		libpthreadpool_print_heap(heap);
-	}
-	
-	for(i = 0; i < 16; ++i)
-	{
-		printf("[INFO] Remove iteration %u\r\n", i);
-		fflush(stdout);
-		
-		rem_task = libpthreadpool_remove_from_heap(heap);
-		
-		if(rem_task == NULL)
+		if(pthread_create(&ret->workers[i], NULL, pthread_pool_fct, ret->queue))
 		{
-			printf("[ERROR] rem_task is null");
+			perror("[FATAL] can not create pthread pool");
 			
-			return 1;
+			exit(EXIT_FAILURE);
 		}
-		
-		printf("Element %u: %p %p %u %u\r\n", i, rem_task->fct, rem_task->fct_prm, rem_task->seq, rem_task->prio);
 	}
 	
-	rem_task = libpthreadpool_remove_from_heap(heap);
-	
-	if(rem_task)
-	{
-		printf("[ERROR] rem_task should be null");
-			
-		return 1;
-	}
-
-	return 0;
+	return ret;
 }
- 
+
+void libpthreadpool_add_task(struct pthreadpool_t *pool, libpthreadpool_function_t fct, libpthreadpool_cb_function_t cb, 
+															void *fct_prm, const unsigned int seq, const unsigned int prio)
+{
+	struct libpthreadpool_task_t to_add;
+	
+	to_add.fct = fct;
+	to_add.cb = cb;
+	
+	to_add.fct_prm = fct_prm;
+	
+	to_add.seq = seq;
+	to_add.prio = prio;
+	
+	libpthreadpool_add_to_heap(pool->queue, to_add);
+}

@@ -19,7 +19,7 @@
 
 struct libpthreadpool_task_t;
 
-struct heap_t
+struct libpthreadpool_heap_t
 {
 	struct libpthreadpool_task_t *arr;
 	
@@ -27,13 +27,12 @@ struct heap_t
 	unsigned int occ;
 	
 	pthread_mutex_t mtx;
+	pthread_cond_t cond;
 };
 
-struct heap_t *libpthreadpool_create_heap();
+struct libpthreadpool_heap_t *libpthreadpool_create_heap();
 
-void libpthreadpool_add_to_heap(struct heap_t *heap, struct libpthreadpool_task_t task);
-struct libpthreadpool_task_t *libpthreadpool_remove_from_heap(struct heap_t *heap);
-
-void libpthreadpool_print_heap(struct heap_t *heap);
+void libpthreadpool_add_to_heap(struct libpthreadpool_heap_t *heap, struct libpthreadpool_task_t task);
+struct libpthreadpool_task_t *libpthreadpool_remove_from_heap(struct libpthreadpool_heap_t *heap);
 
 #endif
